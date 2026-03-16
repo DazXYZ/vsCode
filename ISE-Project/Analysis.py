@@ -15,10 +15,10 @@ def calculate_angle(a, b, c):
     ba = a - b
     bc = c - b
     
-    cosine_angle = np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc))
+    cosine_angle = np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc)) #bit o maths jargon doc product rule quite confusing tbh
     angle = np.arccos(np.clip(cosine_angle, -1.0, 1.0))
     
-    return np.degrees(angle)
+    return np.degrees(angle)   #spits out angle
 
 def get_angle_color(angle, optimal_range, warning_range):
     """Return color based on angle quality (green/yellow/red)"""
@@ -29,33 +29,12 @@ def get_angle_color(angle, optimal_range, warning_range):
     else:
         return (0, 0, 255)  # Red - bad
 
-def detect_rowing_phase(knee_angle, hip_angle, elbow_angle):
-    """
-    Detect the current rowing phase based on joint angles
-    Returns: 'catch', 'drive', 'finish', or 'recovery'
-    """
-    # Catch: knees compressed (small angle), body compressed
-    if knee_angle < 60 and hip_angle < 60:
-        return 'catch'
-    
-    # Finish: legs extended (large knee angle), arms pulled in, body leaned back
-    elif knee_angle > 140 and hip_angle > 140:
-        return 'finish'
-    
-    # Drive: transitioning from catch, legs extending
-    elif knee_angle < 140 and knee_angle >= 60:
-        return 'drive'
-    
-    # Recovery: returning to catch position
-    else:
-        return 'recovery'
-
 # Angle ranges for each rowing phase
 ANGLE_RANGES = {
     'catch': {
         'knee': {'optimal': (35, 45), 'acceptable': (30, 55)},
         'hip': {'optimal': (35, 50), 'acceptable': (30, 60)},
-        'ankle': {'optimal': (80, 100), 'acceptable': (70, 110)}
+        'ankle': {'optimal': (75, 100), 'acceptable': (70, 110)}
     },
     'drive': {
         'knee': {'optimal': (60, 120), 'acceptable': (50, 130)},
@@ -63,24 +42,86 @@ ANGLE_RANGES = {
         'ankle': {'optimal': (85, 105), 'acceptable': (75, 115)}
     },
     'finish': {
-        'knee': {'optimal': (160, 175), 'acceptable': (150, 180)},
-        'hip': {'optimal': (145, 165), 'acceptable': (135, 175)},
+        'knee': {'optimal': (163, 175), 'acceptable': (150, 180)},
+        'hip': {'optimal': (120, 145), 'acceptable': (110, 150)},  # tuned down from debug data
         'ankle': {'optimal': (85, 105), 'acceptable': (75, 115)}
     },
     'recovery': {
-        'knee': {'optimal': (100, 160), 'acceptable': (80, 170)},
+        'knee': {'optimal': (120, 160), 'acceptable': (80, 170)},
         'hip': {'optimal': (100, 150), 'acceptable': (80, 160)},
         'ankle': {'optimal': (85, 105), 'acceptable': (75, 115)}
     }
 }
 
-# Phase colors for display
+# Phase colors for display 
 PHASE_COLORS = {
-    'catch': (255, 100, 100),      # Light blue
-    'drive': (100, 255, 100),      # Light green
-    'finish': (100, 100, 255),     # Light red
-    'recovery': (255, 255, 100)    # Light cyan
+    'catch': (255, 100, 100),      #  blue
+    'drive': (100, 255, 100),      #  green
+    'finish': (100, 100, 255),     #  red
+    'recovery': (255, 255, 100)    #  cyan
 }
+
+class StrokeMachine:
+    def __init__(self):
+        self.state = "recovery"
+        self.pending = None
+        self.count = 0
+
+        # how many consecutive frames a condition must hold before transitioning
+        # finish exits fast (3) to avoid the finish dragging on too long
+        self.debounce = {
+            "finish":   3,
+            "recovery": 4,
+            "catch":    3,
+            "drive":    4
+        }
+
+        # each state can only go to one next state — enforces the stroke cycle
+        self.transitions = {
+            "finish":   ["recovery"],
+            "recovery": ["catch"],
+            "catch":    ["drive"],
+            "drive":    ["finish"]
+        }
+
+    def transition(self, new_state):
+        if new_state not in self.transitions[self.state]:
+            # invalid transition, not in the cycle — ignore it
+            self.pending = None
+            self.count = 0
+            return
+
+        if new_state == self.pending:
+            self.count += 1   # condition held again, keep counting
+        else:
+            self.pending = new_state
+            self.count = 1    # new candidate, start fresh
+
+        if self.count >= self.debounce[self.state]:
+            self.state = new_state   # stable long enough, commit the transition
+            self.pending = None
+            self.count = 0
+
+    def update(self, knee_angle, hip_angle):
+        # hip is the better signal here as knee stays high through finish
+        if self.state == "drive" and knee_angle > 155 and hip_angle > 110:
+            self.transition("finish")
+
+        # hip drops faster than knee coming out of finish — use it as primary trigger
+        elif self.state == "finish" and hip_angle < 120:
+            self.transition("recovery")
+
+        # both must be compressed to confirm we're at the catch
+        elif self.state == "recovery" and knee_angle < 60 and hip_angle < 30:
+            self.transition("catch")
+
+        # legs start extending = drive begins
+        elif self.state == "catch" and knee_angle > 65:
+            self.transition("drive")
+
+
+stroke_machine = StrokeMachine()   # lives outside the loop so state persists frame to frame
+
 
 cap = cv.VideoCapture(r"C:\Users\User\Downloads\rowing_footage1.mov")
 
@@ -117,6 +158,7 @@ with mp_pose.Pose(static_image_mode=False,
             }
 
             # Calculate angles
+            # mmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
             hip_angle_l = calculate_angle(landmarks[JOINTS['shoulder_l']],
                                          landmarks[JOINTS['hip_l']], 
                                          landmarks[JOINTS['knee_l']])
@@ -145,9 +187,11 @@ with mp_pose.Pose(static_image_mode=False,
                                            landmarks[JOINTS['ankle_r']], 
                                            landmarks[JOINTS['toe_r']])
 
-            # Detect rowing phase (using left side as primary)
-            current_phase = detect_rowing_phase(knee_angle_l, hip_angle_l, elbow_angle_l)
-            
+            stroke_machine.update(knee_angle_l, hip_angle_l)        #activate the machine :D
+            current_phase = stroke_machine.state
+
+            print(f"state={stroke_machine.state} | knee={int(knee_angle_l)} hip={int(hip_angle_l)}") #debug line for some angle refining
+
             # Get angle ranges for current phase
             phase_ranges = ANGLE_RANGES[current_phase]
 
@@ -236,7 +280,7 @@ with mp_pose.Pose(static_image_mode=False,
                         int(landmarks[JOINTS['ankle_r']].y * h)), 
                        cv.FONT_HERSHEY_SIMPLEX, 0.5, ankle_color_r, 2)
 
-            # Display phase-specific angle guidelines at bottom
+            #put the rowing stroke phase ideal angles at the bottom of screen. 
             guidelines_y = h - 100
             cv.rectangle(image, (10, guidelines_y - 10), (w - 10, h - 10), (0, 0, 0), -1)
             
