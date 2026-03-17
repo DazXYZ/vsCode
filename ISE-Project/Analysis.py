@@ -43,7 +43,7 @@ ANGLE_RANGES = {
     },
     'finish': {
         'knee': {'optimal': (163, 175), 'acceptable': (150, 180)},
-        'hip': {'optimal': (120, 145), 'acceptable': (110, 150)},  # tuned down from debug data
+        'hip': {'optimal': (120, 145), 'acceptable': (110, 150)},  
         'ankle': {'optimal': (85, 105), 'acceptable': (75, 115)}
     },
     'recovery': {
@@ -67,8 +67,6 @@ class StrokeMachine:
         self.pending = None
         self.count = 0
 
-        # how many consecutive frames a condition must hold before transitioning
-        # finish exits fast (3) to avoid the finish dragging on too long
         self.debounce = {
             "finish":   3,
             "recovery": 4,
@@ -86,7 +84,6 @@ class StrokeMachine:
 
     def transition(self, new_state):
         if new_state not in self.transitions[self.state]:
-            # invalid transition, not in the cycle — ignore it
             self.pending = None
             self.count = 0
             return
@@ -111,7 +108,7 @@ class StrokeMachine:
         elif self.state == "finish" and hip_angle < 120:
             self.transition("recovery")
 
-        # both must be compressed to confirm we're at the catch
+        # both must be compressed to confirm we at the catch
         elif self.state == "recovery" and knee_angle < 60 and hip_angle < 30:
             self.transition("catch")
 
@@ -120,7 +117,7 @@ class StrokeMachine:
             self.transition("drive")
 
 
-stroke_machine = StrokeMachine()   # lives outside the loop so state persists frame to frame
+stroke_machine = StrokeMachine()   
 
 
 cap = cv.VideoCapture(r"C:\Users\User\Downloads\rowing_footage1.mov")
@@ -189,11 +186,17 @@ with mp_pose.Pose(static_image_mode=False,
 
             stroke_machine.update(knee_angle_l, hip_angle_l)        #activate the machine :D
             current_phase = stroke_machine.state
-
-            print(f"state={stroke_machine.state} | knee={int(knee_angle_l)} hip={int(hip_angle_l)}") #debug line for some angle refining
-
-            # Get angle ranges for current phase
             phase_ranges = ANGLE_RANGES[current_phase]
+
+
+            def color_to_quality(color):
+                if color == (0, 255, 0):
+                    return "optimal"
+                elif color == (0, 255, 255):
+                    return "acceptable"
+                else:
+                    return "bad"
+
 
             # Colors based on angles and current phase
             knee_color_l = get_angle_color(knee_angle_l, 
@@ -219,6 +222,8 @@ with mp_pose.Pose(static_image_mode=False,
             ankle_color_r = get_angle_color(ankle_angle_r,
                                              phase_ranges['ankle']['optimal'],
                                              phase_ranges['ankle']['acceptable'])
+
+
 
             # Draw joints
             for j in JOINTS.values():
@@ -246,23 +251,23 @@ with mp_pose.Pose(static_image_mode=False,
             phase_text = f"PHASE: {current_phase.upper()}"
             cv.rectangle(image, (10, 10), (300, 60), (0, 0, 0), -1)
             cv.putText(image, phase_text, (20, 45),
-                       cv.FONT_HERSHEY_SIMPLEX, 1.2, PHASE_COLORS[current_phase], 3)
+                       cv.FONT_HERSHEY_PLAIN, 1.2, PHASE_COLORS[current_phase], 3)
 
             # Left side angles
             cv.putText(image, f"Hip: {int(hip_angle_l)}",
                        (int(landmarks[JOINTS['hip_l']].x * w) + 10, 
                         int(landmarks[JOINTS['hip_l']].y * h)), 
-                       cv.FONT_HERSHEY_SIMPLEX, 0.5, hip_color_l, 2)
+                       cv.FONT_HERSHEY_PLAIN, 0.5, hip_color_l, 2)
             
             cv.putText(image, f"Knee: {int(knee_angle_l)}", 
                        (int(landmarks[JOINTS['knee_l']].x * w) + 10, 
                         int(landmarks[JOINTS['knee_l']].y * h)), 
-                       cv.FONT_HERSHEY_SIMPLEX, 0.5, knee_color_l, 2)
+                       cv.FONT_HERSHEY_PLAIN, 0.5, knee_color_l, 2)
             
             cv.putText(image, f"Ankle: {int(ankle_angle_l)}", 
                        (int(landmarks[JOINTS['ankle_l']].x * w) + 10, 
                         int(landmarks[JOINTS['ankle_l']].y * h)), 
-                       cv.FONT_HERSHEY_SIMPLEX, 0.5, ankle_color_l, 2)
+                       cv.FONT_HERSHEY_PLAIN, 0.5, ankle_color_l, 2)
 
             # Right side angles
             cv.putText(image, f"Hip: {int(hip_angle_r)}",
@@ -273,12 +278,12 @@ with mp_pose.Pose(static_image_mode=False,
             cv.putText(image, f"Knee: {int(knee_angle_r)}", 
                        (int(landmarks[JOINTS['knee_r']].x * w) - 80, 
                         int(landmarks[JOINTS['knee_r']].y * h)), 
-                       cv.FONT_HERSHEY_SIMPLEX, 0.5, knee_color_r, 2)
+                       cv.FONT_HERSHEY_PLAIN, 0.5, knee_color_r, 2)
             
             cv.putText(image, f"Ankle: {int(ankle_angle_r)}", 
                        (int(landmarks[JOINTS['ankle_r']].x * w) - 80, 
                         int(landmarks[JOINTS['ankle_r']].y * h)), 
-                       cv.FONT_HERSHEY_SIMPLEX, 0.5, ankle_color_r, 2)
+                       cv.FONT_HERSHEY_PLAIN, 0.5, ankle_color_r, 2)
 
             #put the rowing stroke phase ideal angles at the bottom of screen. 
             guidelines_y = h - 100
@@ -286,19 +291,19 @@ with mp_pose.Pose(static_image_mode=False,
             
             cv.putText(image, f"{current_phase.upper()} Guidelines:", 
                        (20, guidelines_y + 10),
-                       cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+                       cv.FONT_HERSHEY_PLAIN, 0.6, (255, 255, 255), 2)
             
             cv.putText(image, f"Knee: {phase_ranges['knee']['optimal'][0]}-{phase_ranges['knee']['optimal'][1]}deg", 
                        (20, guidelines_y + 35),
-                       cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+                       cv.FONT_HERSHEY_PLAIN, 0.5, (0, 255, 0), 1)
             
             cv.putText(image, f"Hip: {phase_ranges['hip']['optimal'][0]}-{phase_ranges['hip']['optimal'][1]}deg", 
                        (200, guidelines_y + 35),
-                       cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+                       cv.FONT_HERSHEY_PLAIN, 0.5, (0, 255, 0), 1)
             
             cv.putText(image, f"Ankle: {phase_ranges['ankle']['optimal'][0]}-{phase_ranges['ankle']['optimal'][1]}deg", 
                        (380, guidelines_y + 35),
-                       cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+                       cv.FONT_HERSHEY_PLAIN, 0.5, (0, 255, 0), 1)
 
         cv.imshow('Rowing Pose Overlay', image)
 
