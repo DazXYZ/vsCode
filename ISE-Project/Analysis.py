@@ -6,6 +6,12 @@ import numpy as np
 mp_drawing = mp.solutions.drawing_utils
 mp_pose = mp.solutions.pose
 
+optimal_count = 0
+acceptable_count = 0
+bad_count = 0 
+
+
+
 def calculate_angle(a, b, c):
     """Calculate the angle at point b between points a-b-c"""
     a = np.array([a.x, a.y])
@@ -28,6 +34,20 @@ def get_angle_color(angle, optimal_range, warning_range):
         return (0, 255, 255)  # Yellow - acceptable
     else:
         return (0, 0, 255)  # Red - bad
+    
+
+def color_to_quality(color):
+    color = tuple(color)
+    if color == (0, 255, 0):
+        return "optimal"
+    elif color == (0, 255, 255):
+        return "acceptable"
+    else:
+        return "bad"
+
+
+
+
 
 # Angle ranges for each rowing phase
 ANGLE_RANGES = {
@@ -188,14 +208,8 @@ with mp_pose.Pose(static_image_mode=False,
             current_phase = stroke_machine.state
             phase_ranges = ANGLE_RANGES[current_phase]
 
+            """print(f"state={stroke_machine.state} | knee={int(knee_angle_l)} hip={int(hip_angle_l)}") #debug line for some angle refining"""
 
-            def color_to_quality(color):
-                if color == (0, 255, 0):
-                    return "optimal"
-                elif color == (0, 255, 255):
-                    return "acceptable"
-                else:
-                    return "bad"
 
 
             # Colors based on angles and current phase
@@ -222,6 +236,29 @@ with mp_pose.Pose(static_image_mode=False,
             ankle_color_r = get_angle_color(ankle_angle_r,
                                              phase_ranges['ankle']['optimal'],
                                              phase_ranges['ankle']['acceptable'])
+
+
+            if color_to_quality(knee_color_l) == 'optimal':
+                optimal_count += 1
+            elif color_to_quality(knee_color_l) == 'acceptable':        #we can assume for the sake of simplicity that if the left knee is at a good angle the right knee is also
+                acceptable_count += 1                                   # It's hard to imagine this not being true   
+            else:
+                bad_count += 1   
+
+            if color_to_quality(ankle_color_l) == 'optimal':
+                optimal_count += 1
+            elif color_to_quality(ankle_color_l) == 'acceptable':      
+                acceptable_count += 1                                   
+            else:
+                bad_count += 1                   
+
+            if color_to_quality(hip_color_l) == 'optimal':
+                optimal_count += 1
+            elif color_to_quality(hip_color_l) == 'acceptable':      
+                acceptable_count += 1                                   
+            else:
+                bad_count += 1                          #tis a bit silly but sure look
+
 
 
 
@@ -312,3 +349,15 @@ with mp_pose.Pose(static_image_mode=False,
 
 cap.release()
 cv.destroyAllWindows()
+
+print("============================")
+print("===FORM REVIEW===")
+print("============================")
+
+
+if optimal_count > acceptable_count and bad_count: 
+    print("Overall your form is optimal")
+elif acceptable_count > optimal_count and bad_count:
+        print("Overall your form is acceptable")
+else: 
+    print("Overall your form is bad :(")
