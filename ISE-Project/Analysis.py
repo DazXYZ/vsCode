@@ -115,7 +115,7 @@ class StrokeMachine:
             self.count = 1    # new candidate, start fresh
 
         if self.count >= self.debounce[self.state]:
-            self.state = new_state   # stable long enough, commit the transition
+            self.state = new_state  
             self.pending = None
             self.count = 0
 
