@@ -1,11 +1,12 @@
 import cv2 as cv
-import mediapipe as mp
+import mediapipe as mp 
 import math
 import numpy as np
 
 mp_drawing = mp.solutions.drawing_utils
 mp_pose = mp.solutions.pose
 
+# initialising varz
 optimal_count = 0
 acceptable_count = 0
 bad_count = 0 
@@ -14,14 +15,14 @@ bad_count = 0
 
 def calculate_angle(a, b, c):
     """Calculate the angle at point b between points a-b-c"""
-    a = np.array([a.x, a.y])
+    a = np.array([a.x, a.y]) #using np arrays cause need numpy :D and its faster 
     b = np.array([b.x, b.y])
     c = np.array([c.x, c.y])
     
     ba = a - b
     bc = c - b
     
-    cosine_angle = np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc)) #bit o maths jargon doc product rule quite confusing tbh
+    cosine_angle = np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc)) #bit o maths jargon dot product rule quite confusing tbh
     angle = np.arccos(np.clip(cosine_angle, -1.0, 1.0))
     
     return np.degrees(angle)   #spits out angle
@@ -175,7 +176,6 @@ with mp_pose.Pose(static_image_mode=False,
             }
 
             # Calculate angles
-            # mmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
             hip_angle_l = calculate_angle(landmarks[JOINTS['shoulder_l']],
                                          landmarks[JOINTS['hip_l']], 
                                          landmarks[JOINTS['knee_l']])
@@ -208,7 +208,8 @@ with mp_pose.Pose(static_image_mode=False,
             current_phase = stroke_machine.state
             phase_ranges = ANGLE_RANGES[current_phase]
 
-            """print(f"state={stroke_machine.state} | knee={int(knee_angle_l)} hip={int(hip_angle_l)}") #debug line for some angle refining"""
+            #print(f"state={stroke_machine.state} | knee={int(knee_angle_l)} hip={int(hip_angle_l)}") #debug line for some angle refining 
+            #used this for fixing how long the finishes stays as the displayed phase
 
 
 
@@ -241,7 +242,7 @@ with mp_pose.Pose(static_image_mode=False,
             if color_to_quality(knee_color_l) == 'optimal':
                 optimal_count += 1
             elif color_to_quality(knee_color_l) == 'acceptable':        #we can assume for the sake of simplicity that if the left knee is at a good angle the right knee is also
-                acceptable_count += 1                                   # It's hard to imagine this not being true   
+                acceptable_count += 1                                   # it's hard to think this wouldn't be true except in the case of very bad form 
             else:
                 bad_count += 1   
 
@@ -257,7 +258,7 @@ with mp_pose.Pose(static_image_mode=False,
             elif color_to_quality(hip_color_l) == 'acceptable':      
                 acceptable_count += 1                                   
             else:
-                bad_count += 1                          #tis a bit silly but sure look
+                bad_count += 1                        
 
 
 
@@ -322,7 +323,7 @@ with mp_pose.Pose(static_image_mode=False,
                         int(landmarks[JOINTS['ankle_r']].y * h)), 
                        cv.FONT_HERSHEY_PLAIN, 0.5, ankle_color_r, 2)
 
-            #put the rowing stroke phase ideal angles at the bottom of screen. 
+            # Put the rowing stroke phase ideal angles at the bottom of screen. 
             guidelines_y = h - 100
             cv.rectangle(image, (10, guidelines_y - 10), (w - 10, h - 10), (0, 0, 0), -1)
             
@@ -351,13 +352,13 @@ cap.release()
 cv.destroyAllWindows()
 
 print("============================")
-print("===FORM REVIEW===")
+print("========FORM REVIEW========")
 print("============================")
 
-
+#simple solutions 
 if optimal_count > acceptable_count and bad_count: 
     print("Overall your form is optimal")
 elif acceptable_count > optimal_count and bad_count:
         print("Overall your form is acceptable")
 else: 
-    print("Overall your form is bad :(")
+    print("Overall your form is bad :(") 
