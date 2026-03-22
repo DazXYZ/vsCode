@@ -25,9 +25,6 @@ cap = cv.VideoCapture(r"path/to/your/rowing_footage.mov")
 ```bash
 python rowing_analysis.py
 ```
-
-Press `Esc` to exit. A form summary (optimal / acceptable / bad) is printed to the console on exit. Works best with side-on footage where the full body is visible.
-
 ---
 
 ## Phase Detection
